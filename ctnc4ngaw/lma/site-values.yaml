@@ -2,7 +2,6 @@ apiVersion: openinfradev.github.com/v1
 kind: HelmValuesTransformer
 metadata:
   name: site
-
 global:
   nodeSelector:
     taco-lma: enabled
@@ -14,18 +13,15 @@ global:
   defaultUser: taco
   thanosObjstoreSecret: taco-objstore-secret
   thanosPrimaryCluster: false
-  # servicemesh dashboard and grafana
   realms: 04a70f29
   serviceDomain: taco-cat.xyz
   keycloakDomain: keycloak-eom.taco-cat.xyz
   grafanaClientSecret: JLtsanYtrCg21RGxrcVmQP0GeuDFUhpA
-
 charts:
 - name: prometheus-operator
   override:
     prometheusOperator.nodeSelector: $(nodeSelector)
     prometheusOperator.admissionWebhooks.patch.image.sha: ""
-
 - name: prometheus
   override:
     prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.storageClassName: $(storageClassName)
@@ -33,37 +29,30 @@ charts:
     prometheus.prometheusSpec.retention: 2d
     prometheus.prometheusSpec.externalLabels.taco_cluster: $(clusterName)
     prometheus.prometheusSpec.nodeSelector: $(nodeSelector)
-    
     alertmanager.service.type: NodePort
     alertmanager.service.nodePort: 30111
     alertmanager.alertmanagerSpec.alertmanagerConfigSelector.matchLabels.alertmanagerConfig: example
     alertmanager.alertmanagerSpec.nodeSelector: $(nodeSelector)
     alertmanager.alertmanagerSpec.retention: 2h
     alertmanager.config.global.slack_api_url: https://hooks.slack.com/services/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
-
-- name: prometheus-node-exporter  
+- name: prometheus-node-exporter
   override:
     hostNetwork: false
-
 - name: kube-state-metrics
   override:
     nodeSelector: $(nodeSelector)
-
 - name: prometheus-pushgateway
   override:
     nodeSelector: $(nodeSelector)
-
 - name: prometheus-process-exporter
   override:
     conf.processes: dockerd,kubelet,kube-proxy,ntpd,node
     pod.hostNetwork: false
-
 - name: grafana
   override:
     adminPassword: password
     persistence.storageClassName: $(storageClassName)
     sidecar.dashboards.searchNamespace: ALL
-    # grafana oidc
     service.type: LoadBalancer
     grafana.ini.server:
       domain: dashboard-$(realms).$(serviceDomain)
@@ -90,19 +79,17 @@ charts:
     grafana.ini.user:
       auto_assign_org: true
       auto_assign_org_role: Admin
-
 - name: fluent-operator
-
 - name: fluentbit
   override:
     fluentbit:
       clusterName: $(clusterName)
       outputs:
-        loki: 
+        loki:
         - name: taco-loki
           host: loki
           port: 3100
-      targetLogs: 
+      targetLogs:
       - tag: kube.*
         bufferChunkSize: 2M
         bufferMaxSize: 5M
@@ -126,7 +113,6 @@ charts:
         parser: taco-syslog-parser-for-ubuntu
         path: /var/log/syslog
         type: syslog
-
 - name: addons
   override:
     SPECIAL_VALUE: SPECIAL
@@ -141,25 +127,22 @@ charts:
     serviceMonitor.jaeger.enabled: false
     prometheusRules.istio.aggregation.enabled: false
     prometheusRules.istio.optimization.enabled: false
-
 - name: prometheus-adapter
   override:
     nodeSelector: $(nodeSelector)
-
 - name: kubernetes-event-exporter
   override:
     conf.recievers:
-      - name: loki
-        type: file
-        config:
-          path: "/tmp/kubernetes-event.log"
+    - name: loki
+      type: file
+      config:
+        path: "/tmp/kubernetes-event.log"
     addons:
-      loki: 
+      loki:
         enabled: true
         host: loki
-        port: 3100      
+        port: 3100
         target_file: "/tmp/kubernetes-event.log"
-        
     conf.default.hosts:
     - "https://eck-elasticsearch-es-http.lma.svc.$(clusterName):9200"
 
@@ -174,15 +157,13 @@ charts:
     queryFrontend.service.http.nodePort: 30007
     querier.stores:
     - prometheus-operated.lma.svc.$(clusterName):10901
+    - a19c6db414b8744a1bab04419bd87208-835653775.ap-northeast-2.elb.amazonaws.com:10901
     bucketweb.enabled: $(thanosPrimaryCluster)
     bucketweb.nodeSelector: $(nodeSelector)
     compactor.enabled: $(thanosPrimaryCluster)
     compactor.nodeSelector: $(nodeSelector)
     storegateway.nodeSelector: $(nodeSelector)
     compactor.persistence.size: 8Gi
-    # compactor.extraFlags:
-    # - --compact.enable-vertical-compaction
-    # - --deduplication.replica-label="replica"
     storegateway.persistence.size: 8Gi
     ruler.enabled: $(thanosPrimaryCluster)
     ruler.nodeSelector: $(nodeSelector)
@@ -195,7 +176,6 @@ charts:
     minio.persistence.storageClass: $(storageClassName)
     minio.persistence.accessMode: ReadWriteOnce
     minio.persistence.size: 10Gi
-
 - name: thanos-config
   override:
     objectStorage:
@@ -206,13 +186,13 @@ charts:
       secretName: $(thanosObjstoreSecret)
     sidecarsService.name: thanos-sidecars
     sidecarsService.endpoints:
-      - 192.168.97.102 # should not be in the loopback range (127.0.0.0/8)
+    - 192.168.97.102   # should not be in the loopback range (127.0.0.0/8)
 
 - name: prepare-etcd-secret
   override:
     nodeSelector:
       "node-role.kubernetes.io/master": ""
     tolerations:
-      - key: "node-role.kubernetes.io/master"
-        effect: "NoSchedule"
-        operator: "Exists"
+    - key: "node-role.kubernetes.io/master"
+      effect: "NoSchedule"
+      operator: "Exists"
